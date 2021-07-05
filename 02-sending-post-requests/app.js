@@ -52,7 +52,7 @@ app.use("/auth", authRoutes);
 const startServer = async () => {
   try {
     await mongoose.connect(
-      "mongodb+srv://link777:V15042002g@musordb.wlgem.mongodb.net/musorDB?retryWrites=true&w=majority",
+      "YOUR TOKEN",
       { useNewUrlParser: true, useUnifiedTopology: true }
     );
     const server = app.listen(PORT);
