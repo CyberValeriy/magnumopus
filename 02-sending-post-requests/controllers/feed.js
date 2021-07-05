@@ -3,6 +3,7 @@ const Post = require("../models/post");
 const User = require("../models/user");
 const fs = require("fs");
 const path = require("path");
+const io = require("../socket");
 
 exports.getPosts = async (req, res, next) => {
   const currentPage = req.query.page || 1;
@@ -12,6 +13,7 @@ exports.getPosts = async (req, res, next) => {
   try {
     totalPosts = await Post.find().countDocuments();
     posts = await Post.find()
+      .populate("creator")
       .skip((currentPage - 1) * postsPerPage)
       .limit(postsPerPage);
   } catch (err) {
@@ -60,6 +62,17 @@ exports.createPost = async (req, res, next) => {
   }
   user.posts.push(result);
   await user.save();
+  console.log({...result});
+  await io.getIO().emit("posts", {
+    action: "create",
+    post: {
+      ...result._doc,
+      creator: {
+        _id: req.userId,
+        name: user.name,
+      },
+    },
+  });
   res.status(201).json({
     message: "Post created successfully!",
     post: result,
@@ -95,14 +108,14 @@ exports.updatePost = async (req, res) => {
   }
   let post;
   try {
-    post = await Post.findById(postId);
+    post = await Post.findById(postId).populate('creator');
   } catch (err) {
     return res.status(422).json({ message: err });
   }
   if (!post) {
     return res.status(422).json({ message: "Invalid post id" });
   }
-  if (req.userId !== post.creator.toString()) {
+  if (req.userId !== post.creator._id.toString()) {
     return res.status(403).json({ message: new Error("Not authorized!") });
   }
   if (imageUrl !== post.imageUrl) {
@@ -118,6 +131,7 @@ exports.updatePost = async (req, res) => {
   } catch (err) {
     return res.json({ message: err }).status(500);
   }
+  io.getIO().emit('posts',{action:'update',post:result})
   res.status("200").json({ message: "Post updated!", post: result });
 };
 
@@ -153,6 +167,7 @@ exports.deletePost = async (req, res) => {
   } catch (err) {
     return res.status(500).json({ message: err });
   }
+  io.getIO().emit('posts',{action:'delete',post:postId})
   res.status(200).json({ message: "Post deleted!" });
 };
 
